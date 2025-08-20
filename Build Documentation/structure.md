@@ -1,16 +1,67 @@
-### Project Structure (Sprint 1 - Initial Setup)
+### Project Structure (Sprint 1 - Current)
 
 Root: llm-digit-audio-classifier_coding_challenge
 
 - Build Documentation/
+  - API-Reference.md
+  - Schemas.md
+  - Sprint-Progress.md
+  - structure.md
+  - Troubleshooting.md
 - Cursor Ticket Prompts/
-- Deep Research Overview.md
-- Documentation/
-- README.md
-- Tickets/
+  - Main Cursor Reference Prompt/
+    - Main Cursor Prompt.md
+  - Prompts/
+    - Sprint 1/
+    - Sprint 2/
+    - Sprint 3/
+    - Sprint 4/
 - data/
-- llm-coding-challenge-audio.md
+- Documentation/
+  - Assets/
+    - Platform Architecture Diagram Mermaid.rtf
+  - Images/
+    - Platform Architecture Diagram.svg
+  - Architecture Document.md
+  - Implementation Plan Document.md
+  - Product Requirements Document.md
 - models/
-- requirements.txt
 - src/
+  - __init__.py
+  - data_processing.py
 - tests/
+  - conftest.py
+  - test_data_processing.py
+  - test_structure.py
+- Tickets/
+  - Sprint 1/
+    - Sprint 1 Overview.md
+    - TICKET-1001 - Project Setup and Initial Folder Structure.md
+    - TICKET-1002 - Data Loading and Resampling.md
+    - TICKET-1003 - MFCC Feature Extraction.md
+    - TICKET-1004 - Padding and Normalization.md
+    - TICKET-1005 - Full Data Pipeline & Dataset Generation.md
+    - TICKET-1006 - Initial Documentation & Progress Update.md
+  - Sprint 2/
+    - Sprint 2 Overview.md
+    - TICKET-2001 - Model Definition.md
+    - TICKET-2002 - Model Training Script.md
+    - TICKET-2003 - Initial Evaluation and Validation.md
+    - TICKET-2004 - Documentation & Progress Update.md
+  - Sprint 3/
+    - Sprint 3 Overview.md
+    - TICKET-3001 - Implement Single-Audio Inference Function.md
+    - TICKET-3002 - Implement Latency Measurement.md
+    - TICKET-3003 - Implement Confusion Matrix & Detailed Metrics.md
+    - TICKET-3004 - Create Main Execution Script.md
+    - TICKET-3005 - Final Documentation and Progress Update.md
+  - Sprint 4/
+    - Sprint 4 Overview.md
+    - TICKET-4001 - Implement Noise Simulation for Robustness Testing.md
+    - TICKET-4002 - Implement Live Microphone Integration.md
+    - TICKET-4003 - Final Documentation and Project Review.md
+    - TICKET-4004 - Final Code Review and Submission Preparation.md
+- Deep Research Overview.md
+- llm-coding-challenge-audio.md
+- README.md
+- requirements.txt

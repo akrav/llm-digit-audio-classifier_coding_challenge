@@ -1,5 +1,5 @@
 import os
-from typing import Tuple
+from typing import Tuple, List, Sequence
 
 import librosa
 import numpy as np
@@ -121,4 +121,85 @@ def normalize_features(features: np.ndarray) -> np.ndarray:
 	X = features.T.astype(np.float32, copy=False)
 	scaler = StandardScaler()
 	Xn = scaler.fit_transform(X)
-	return Xn.T.astype(np.float32, copy=False) 
+	return Xn.T.astype(np.float32, copy=False)
+
+
+def preprocess_audio_to_features(audio: np.ndarray, sr: int, max_len: int = 200) -> np.ndarray:
+	"""Full preprocessing for one audio clip: MFCC -> pad -> normalize.
+
+	Returns array of shape (40, max_len).
+	"""
+	mfcc = extract_mfcc_features(audio, sr, n_mfcc=40)
+	mfcc_padded = pad_features(mfcc, max_len=max_len)
+	mfcc_norm = normalize_features(mfcc_padded)
+	return mfcc_norm
+
+
+def generate_dataset_from_filepaths(filepaths: Sequence[str], labels: Sequence[int], max_len: int = 200) -> Tuple[np.ndarray, np.ndarray]:
+	"""Process a list of local filepaths into features and labels arrays.
+
+	Returns X shape (N, 40, max_len), y shape (N,).
+	"""
+	if len(filepaths) != len(labels):
+		raise ValueError("filepaths and labels must have the same length")
+
+	features_list: List[np.ndarray] = []
+	for p in filepaths:
+		audio, sr = load_audio(p)
+		features_list.append(preprocess_audio_to_features(audio, sr, max_len=max_len))
+
+	X = np.stack(features_list, axis=0).astype(np.float32)
+	y = np.asarray(labels, dtype=np.int64)
+	return X, y
+
+
+def load_fsdd_from_hf(split: str = "train", max_len: int = 200) -> Tuple[np.ndarray, np.ndarray]:
+	"""Load FSDD from Hugging Face and preprocess into arrays.
+
+	Dataset: mteb/free-spoken-digit-dataset
+	Split: 'train' or 'test'
+	"""
+	try:
+		from datasets import load_dataset
+	except Exception as e:
+		raise RuntimeError("Please install the 'datasets' package to load from Hugging Face.") from e
+
+	ds = load_dataset("mteb/free-spoken-digit-dataset", split=split)
+	features_list: List[np.ndarray] = []
+	labels_list: List[int] = []
+
+	for ex in ds:
+		# Try common label fields
+		label = None
+		for key in ("label", "digit", "class", "target"):
+			if key in ex:
+				label = int(ex[key])
+				break
+		if label is None:
+			raise KeyError("Could not find label field in dataset example")
+
+		# Prefer audio array if available; fall back to path
+		if "audio" in ex and isinstance(ex["audio"], dict) and "array" in ex["audio"] and "sampling_rate" in ex["audio"]:
+			audio = np.asarray(ex["audio"]["array"], dtype=np.float32)
+			sr = int(ex["audio"]["sampling_rate"])
+			if sr != TARGET_SAMPLE_RATE:
+				audio = librosa.resample(y=audio, orig_sr=sr, target_sr=TARGET_SAMPLE_RATE)
+			feat = preprocess_audio_to_features(audio, TARGET_SAMPLE_RATE, max_len=max_len)
+		else:
+			# Attempt to use cached path if provided
+			path = None
+			if "audio" in ex and isinstance(ex["audio"], dict) and "path" in ex["audio"] and ex["audio"]["path"]:
+				path = ex["audio"]["path"]
+			elif "path" in ex:
+				path = ex["path"]
+			if not path:
+				raise KeyError("Example missing audio array and path")
+			audio, _ = load_audio(path)
+			feat = preprocess_audio_to_features(audio, TARGET_SAMPLE_RATE, max_len=max_len)
+
+		features_list.append(feat)
+		labels_list.append(label)
+
+	X = np.stack(features_list, axis=0).astype(np.float32)
+	y = np.asarray(labels_list, dtype=np.int64)
+	return X, y 

@@ -6,7 +6,7 @@ import struct
 import numpy as np
 import pytest
 
-from src.data_processing import load_audio, TARGET_SAMPLE_RATE, extract_mfcc_features, pad_features, normalize_features
+from src.data_processing import load_audio, TARGET_SAMPLE_RATE, extract_mfcc_features, pad_features, normalize_features, preprocess_audio_to_features, generate_dataset_from_filepaths
 
 
 def _write_wav(path: str, data: np.ndarray, sr: int) -> None:
@@ -44,7 +44,7 @@ def test_load_audio_raises_on_missing_file():
 
 def test_extract_mfcc_features_shape():
 	# Generate a short sine wave at target SR
-	duration = 0.25
+	duration = 0.3
 	t = np.linspace(0, duration, int(TARGET_SAMPLE_RATE * duration), endpoint=False)
 	signal = 0.1 * np.sin(2 * np.pi * 440 * t).astype(np.float32)
 	mfcc = extract_mfcc_features(signal, TARGET_SAMPLE_RATE)
@@ -77,4 +77,23 @@ def test_normalize_features_stats():
 	stds = norm.std(axis=1)
 	assert np.all(np.isfinite(means)) and np.all(np.isfinite(stds))
 	assert np.all(np.abs(means) < 1e-3)
-	assert np.all(np.abs(stds - 1.0) < 1e-3) 
+	assert np.all(np.abs(stds - 1.0) < 1e-3)
+
+
+def test_generate_dataset_from_filepaths_shapes():
+	with tempfile.TemporaryDirectory() as tmp:
+		paths = []
+		labels = []
+		for i, freq in enumerate([300, 600, 900]):
+			wav_path = os.path.join(tmp, f"sig_{i}.wav")
+			duration = 0.3
+			t = np.linspace(0, duration, int(16000 * duration), endpoint=False)
+			sig = 0.1 * np.sin(2 * np.pi * freq * t)
+			_write_wav(wav_path, sig, 16000)
+			paths.append(wav_path)
+			labels.append(i % 10)
+		X, y = generate_dataset_from_filepaths(paths, labels, max_len=200)
+		assert X.shape == (3, 40, 200)
+		assert y.shape == (3,)
+		assert X.dtype == np.float32
+		assert y.dtype == np.int64 
