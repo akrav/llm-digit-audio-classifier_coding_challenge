@@ -1,0 +1,11 @@
+# Core
+numpy>=1.24
+librosa>=0.10
+scikit-learn>=1.3
+
+# Model (added in Sprint 2)
+tensorflow>=2.15
+
+# Bonus/optional (Sprint 4)
+sounddevice>=0.4
+audiomentations>=0.35

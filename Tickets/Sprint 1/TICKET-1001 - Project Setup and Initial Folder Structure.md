@@ -8,4 +8,11 @@
   - **Tools**: Git, your code editor.
 - **Testing**:
   - **Test Path**: Manually verify that the folder structure and files are created as specified.
-  - **Acceptance Criteria**: The project directory is correctly structured. 
+  - **Acceptance Criteria**: The project directory is correctly structured.
+
+---
+
+- **Status**: Completed
+  - Created folders: `src/`, `data/`, `models/`, `tests/`
+  - Added files: `README.md`, `requirements.txt`, `Build Documentation/structure.md`, `Build Documentation/Sprint-Progress.md`, `Build Documentation/Troubleshooting.md`, `Build Documentation/API-Reference.md`, `Build Documentation/Schemas.md`
+  - Added test: `tests/test_structure.py` to sanity-check initial structure 
