@@ -1,0 +1,20 @@
+graph TD
+    A[Raw Audio WAV Files] --> B(Data Ingestion);
+    B --> C{Preprocessing};
+    C --> D(Feature Extraction);
+    D --> E{Normalization & Padding};
+    E --> F{Train/Test Split};
+    F --> G[Training Data];
+    F --> H[Test Data];
+    G --> I(Model Training);
+    I --> J[Trained Model];
+    H --> K(Model Evaluation);
+    K --> L{Performance Metrics};
+    J --> M(Inference Module);
+    M --> N[New Audio Input];
+    N --> O(Prediction);
+    O --> P[Output Digit];
+    subgraph Bonus Challenges
+        Q[Microphone Input] --> N;
+        R[Simulated Noise] --> C;
+    end
