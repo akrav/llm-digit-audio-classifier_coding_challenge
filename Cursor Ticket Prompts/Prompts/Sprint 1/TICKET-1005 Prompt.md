@@ -19,6 +19,7 @@ Environment and secrets:
 
 Objective:
 - Build the full dataset from FSDD: load files, extract MFCCs, pad, normalize, and assemble `(num_samples, 40, 200)` features + labels. Persist arrays if needed.
+- Data Source: Use the Free Spoken Digit Dataset from Hugging Face (train/test splits): https://huggingface.co/datasets/mteb/free-spoken-digit-dataset/viewer/default/train?views%5B%5D=train
 
 Constraints and style:
 - Follow best practices; keep changes scoped; no secrets.

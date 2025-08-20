@@ -19,6 +19,7 @@ Environment and secrets:
 
 Objective:
 - Implement TICKET-1002 fully: create `load_audio(file_path)` in `src/data_processing.py` that loads and resamples audio to 8000 Hz using librosa; add tests.
+- Data Source: Use the Free Spoken Digit Dataset from Hugging Face: https://huggingface.co/datasets/mteb/free-spoken-digit-dataset/viewer/default/train?views%5B%5D=train
 
 Constraints and style:
 - Follow Engineering Best Practices (naming, error handling, security, logging).

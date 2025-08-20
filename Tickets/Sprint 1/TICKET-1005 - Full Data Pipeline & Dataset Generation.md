@@ -5,6 +5,7 @@
 - **Requirements / Other docs**:
   - **Dataset Generation**: The script should create a final dataset that includes all pre-processed features and their corresponding labels.
   - **Tools**: `os`, `numpy`.
+  - **Data Source**: Use the Free Spoken Digit Dataset from Hugging Face (train/test splits): https://huggingface.co/datasets/mteb/free-spoken-digit-dataset/viewer/default/train?views%5B%5D=train
 - **Testing**:
   - **Test Path**: Run the script and verify that the final feature and label arrays have the correct dimensions (e.g., `(num_samples, 40, 200)`) and that the data types are correct.
   - **Acceptance Criteria**: The dataset is generated successfully and has the correct shape and data types. 
