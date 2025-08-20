@@ -4,6 +4,7 @@ from typing import Tuple
 import librosa
 import numpy as np
 import soundfile as sf
+from sklearn.preprocessing import StandardScaler
 
 TARGET_SAMPLE_RATE = 8000
 
@@ -69,4 +70,55 @@ def extract_mfcc_features(audio: np.ndarray, sr: int, n_mfcc: int = 40) -> np.nd
 	audio = audio.astype(np.float32, copy=False)
 
 	mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=n_mfcc)
-	return mfcc.astype(np.float32, copy=False) 
+	return mfcc.astype(np.float32, copy=False)
+
+
+def pad_features(mfcc_array: np.ndarray, max_len: int) -> np.ndarray:
+	"""Pad or truncate MFCC array to a fixed number of frames.
+
+	Args:
+		mfcc_array: MFCCs shaped (n_mfcc, num_frames).
+		max_len: Desired number of frames after padding/truncation.
+
+	Returns:
+		Array shaped (n_mfcc, max_len), zero-padded at the end if needed.
+	"""
+	if mfcc_array is None or mfcc_array.size == 0:
+		raise ValueError("MFCC array is empty; cannot pad")
+	if max_len <= 0:
+		raise ValueError("max_len must be positive")
+	if mfcc_array.ndim != 2:
+		raise ValueError("mfcc_array must have shape (n_mfcc, num_frames)")
+
+	n_mfcc, num_frames = mfcc_array.shape
+	if num_frames == max_len:
+		return mfcc_array.astype(np.float32, copy=False)
+	elif num_frames > max_len:
+		return mfcc_array[:, :max_len].astype(np.float32, copy=False)
+	else:
+		pad_width = max_len - num_frames
+		padded = np.pad(mfcc_array, ((0, 0), (0, pad_width)), mode='constant', constant_values=0.0)
+		return padded.astype(np.float32, copy=False)
+
+
+def normalize_features(features: np.ndarray) -> np.ndarray:
+	"""Normalize features to ~0 mean and ~1 std per coefficient.
+
+	Treats time frames as samples and MFCC coefficients as features.
+
+	Args:
+		features: Array shaped (n_mfcc, num_frames).
+
+	Returns:
+		Array of same shape, normalized per coefficient.
+	"""
+	if features is None or features.size == 0:
+		raise ValueError("features array is empty; cannot normalize")
+	if features.ndim != 2:
+		raise ValueError("features must have shape (n_mfcc, num_frames)")
+
+	# Transpose to (num_frames, n_mfcc) for sklearn
+	X = features.T.astype(np.float32, copy=False)
+	scaler = StandardScaler()
+	Xn = scaler.fit_transform(X)
+	return Xn.T.astype(np.float32, copy=False) 

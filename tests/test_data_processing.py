@@ -6,7 +6,7 @@ import struct
 import numpy as np
 import pytest
 
-from src.data_processing import load_audio, TARGET_SAMPLE_RATE, extract_mfcc_features
+from src.data_processing import load_audio, TARGET_SAMPLE_RATE, extract_mfcc_features, pad_features, normalize_features
 
 
 def _write_wav(path: str, data: np.ndarray, sr: int) -> None:
@@ -55,4 +55,26 @@ def test_extract_mfcc_features_shape():
 
 def test_extract_mfcc_features_raises_on_empty_audio():
 	with pytest.raises(ValueError):
-		extract_mfcc_features(np.array([], dtype=np.float32), TARGET_SAMPLE_RATE) 
+		extract_mfcc_features(np.array([], dtype=np.float32), TARGET_SAMPLE_RATE)
+
+
+def test_pad_features_shapes():
+	arr = np.random.randn(40, 150).astype(np.float32)
+	padded = pad_features(arr, 200)
+	assert padded.shape == (40, 200)
+	# Truncate case
+	truncated = pad_features(arr, 100)
+	assert truncated.shape == (40, 100)
+
+
+def test_normalize_features_stats():
+	# Create synthetic MFCCs with known mean/std per coefficient
+	rng = np.random.default_rng(0)
+	arr = rng.normal(loc=5.0, scale=2.0, size=(40, 120)).astype(np.float32)
+	norm = normalize_features(arr)
+	# Means close to 0 and std close to 1 per coefficient
+	means = norm.mean(axis=1)
+	stds = norm.std(axis=1)
+	assert np.all(np.isfinite(means)) and np.all(np.isfinite(stds))
+	assert np.all(np.abs(means) < 1e-3)
+	assert np.all(np.abs(stds - 1.0) < 1e-3) 
