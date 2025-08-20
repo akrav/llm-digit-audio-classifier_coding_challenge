@@ -1,0 +1,34 @@
+### Ticket: Achieve 95%+ Test Accuracy with Regularized Optimization
+
+- **Ticket Number**: TICKET-2005
+- **Description**: Iteratively optimize the CNN to surpass 95% test accuracy on FSDD while avoiding overfitting. Implement a training loop with regularization, data augmentation, and evaluation after each change. Keep the model lightweight and low-latency.
+- **Requirements / Other docs**:
+  - **Data Source**: Free Spoken Digit Dataset from Hugging Face (train/test splits): https://huggingface.co/datasets/mteb/free-spoken-digit-dataset/viewer/default/train?views%5B%5D=train
+  - **Code Targets**:
+    - `src/model.py`: add optional improvements (e.g., BatchNorm, Dropout, L2, extra conv block, GlobalAveragePooling2D option)
+    - `src/data_processing.py`: optional audio augmentations (noise, time/frequency masking) applied to training only
+    - `src/train.py` (new) or extend existing training entrypoint in `src/model.py` with:
+      - deterministic seeding
+      - stratified train/val split from train split
+      - callbacks: EarlyStopping (monitor val_accuracy or val_loss, patience 8–12), ReduceLROnPlateau, ModelCheckpoint (best by val_accuracy)
+      - learning rate schedule (cosine or step decay)
+      - experiment logging (CSVLogger) with key metrics
+  - **Evaluation**:
+    - Keep test split strictly held-out; do not tune on it
+    - Report train, val, test accuracy; confusion matrix; classification report
+    - Track params count, model size, and inference latency on a sample batch
+  - **Anti-overfitting**:
+    - Use regularization (Dropout 0.2–0.5, L2=1e-4), data augmentation, early stopping
+    - Prefer GlobalAveragePooling2D over large Dense if parameters explode
+  - **Reproducibility**:
+    - Fix random seeds, log exact hyperparameters and best checkpoint path
+- **Tools**: `keras` (Torch backend), `numpy`, `scikit-learn`, `datasets`, `librosa`, optional `audiomentations`.
+- **Testing**:
+  - **Automated**: unit tests for new utilities (e.g., LR schedule factory, shape checks for new layers)
+  - **Manual**: run training script to completion; verify logs, saved best model, and final metrics on test set
+- **Acceptance Criteria**:
+  - Test accuracy ≥ 95% on the held-out test split
+  - No signs of severe overfitting (train vs test gap ≤ ~5–7 pp)
+  - Best model checkpoint saved under `models/` and loadable for inference
+  - Training logs and final metrics are written and summarized in `Build Documentation/Sprint-Progress.md`
+  - Code remains lightweight and inference latency stays low 
