@@ -109,6 +109,10 @@ def train_and_save_model(max_len: int = 200, epochs: int = 1, batch_size: int = 
 		verbose=1,
 	)
 
+	# Evaluate on test set and print accuracy
+	test_loss, test_acc = model.evaluate(X_test, y_test, verbose=0)
+	print(f"Test accuracy ({loaded_from}): {test_acc:.4f}")
+
 	# Ensure models directory exists
 	os.makedirs("models", exist_ok=True)
 	# Save model in Keras v3 format
@@ -121,5 +125,5 @@ def train_and_save_model(max_len: int = 200, epochs: int = 1, batch_size: int = 
 
 
 if __name__ == "__main__":
-	# Minimal CLI behavior to train and save
+	# Minimal CLI behavior to train, evaluate, and save
 	train_and_save_model() 
