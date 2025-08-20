@@ -8,6 +8,9 @@ from sklearn.preprocessing import StandardScaler
 
 TARGET_SAMPLE_RATE = 8000
 
+# Dataset repo id for HF hub downloads
+HF_FSDD_REPO = "mteb/free-spoken-digit-dataset"
+
 
 def load_audio(file_path: str) -> Tuple[np.ndarray, int]:
 	"""Load an audio file and resample it to TARGET_SAMPLE_RATE.
@@ -153,6 +156,12 @@ def generate_dataset_from_filepaths(filepaths: Sequence[str], labels: Sequence[i
 	return X, y
 
 
+def _hf_download_audio(filename: str) -> str:
+	"""Download an audio file from the HF dataset repo and return local path."""
+	from huggingface_hub import hf_hub_download
+	return hf_hub_download(repo_id=HF_FSDD_REPO, filename=filename, repo_type="dataset")
+
+
 def load_fsdd_from_hf(split: str = "train", max_len: int = 200) -> Tuple[np.ndarray, np.ndarray]:
 	"""Load FSDD from Hugging Face and preprocess into arrays.
 
@@ -161,15 +170,20 @@ def load_fsdd_from_hf(split: str = "train", max_len: int = 200) -> Tuple[np.ndar
 	"""
 	try:
 		from datasets import load_dataset
+		from datasets.features import Audio
 	except Exception as e:
 		raise RuntimeError("Please install the 'datasets' package to load from Hugging Face.") from e
 
 	ds = load_dataset("mteb/free-spoken-digit-dataset", split=split)
+	# Prefer decoding to arrays now that torchcodec is available; keep path fallback as secondary
+	if "audio" in ds.features and isinstance(ds.features["audio"], Audio.__mro__[0]):
+		ds = ds.cast_column("audio", Audio(decode=True))
+
 	features_list: List[np.ndarray] = []
 	labels_list: List[int] = []
 
 	for ex in ds:
-		# Try common label fields
+		# Label
 		label = None
 		for key in ("label", "digit", "class", "target"):
 			if key in ex:
@@ -178,7 +192,7 @@ def load_fsdd_from_hf(split: str = "train", max_len: int = 200) -> Tuple[np.ndar
 		if label is None:
 			raise KeyError("Could not find label field in dataset example")
 
-		# Prefer audio array if available; fall back to path
+		# Prefer decoded array if available
 		if "audio" in ex and isinstance(ex["audio"], dict) and "array" in ex["audio"] and "sampling_rate" in ex["audio"]:
 			audio = np.asarray(ex["audio"]["array"], dtype=np.float32)
 			sr = int(ex["audio"]["sampling_rate"])
@@ -186,14 +200,17 @@ def load_fsdd_from_hf(split: str = "train", max_len: int = 200) -> Tuple[np.ndar
 				audio = librosa.resample(y=audio, orig_sr=sr, target_sr=TARGET_SAMPLE_RATE)
 			feat = preprocess_audio_to_features(audio, TARGET_SAMPLE_RATE, max_len=max_len)
 		else:
-			# Attempt to use cached path if provided
+			# Load via file path; if relative, download via HF hub
 			path = None
-			if "audio" in ex and isinstance(ex["audio"], dict) and "path" in ex["audio"] and ex["audio"]["path"]:
+			if "audio" in ex and isinstance(ex["audio"], dict) and ex["audio"].get("path"):
 				path = ex["audio"]["path"]
 			elif "path" in ex:
 				path = ex["path"]
 			if not path:
-				raise KeyError("Example missing audio array and path")
+				raise KeyError("Example missing audio path")
+			if not os.path.isabs(path) or not os.path.isfile(path):
+				# Attempt to download the file by filename from the dataset repo
+				path = _hf_download_audio(os.path.basename(path))
 			audio, _ = load_audio(path)
 			feat = preprocess_audio_to_features(audio, TARGET_SAMPLE_RATE, max_len=max_len)
 

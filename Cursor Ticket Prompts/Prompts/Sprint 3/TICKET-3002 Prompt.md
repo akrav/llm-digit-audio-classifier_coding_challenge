@@ -5,14 +5,14 @@ Please execute this ticket:
 Ticket to execute:
 - TICKET_ID: 3002
 - TICKET_NAME: TICKET-3002 - Implement Latency Measurement.md
-- TICKET_FILE: /Users/adam/Documents/GitHub/CloudWalk_Techinical_Challenge/Tickets/Sprint 3/TICKET-3002 - Implement Latency Measurement.md
+- TICKET_FILE: /Users/adam/Documents/GitHub/llm-digit-audio-classifier_coding_challenge/Tickets/Sprint 3/TICKET-3002 - Implement Latency Measurement.md
 
 Permanent references (always follow):
-- API Reference: /Users/adam/Documents/GitHub/CloudWalk_Techinical_Challenge/Build Documentation/API-Reference.md
-- Database Schema: /Users/adam/Documents/GitHub/CloudWalk_Techinical_Challenge/Build Documentation/Schemas.md
-- Project Structure: /Users/adam/Documents/GitHub/CloudWalk_Techinical_Challenge/Build Documentation/structure.md
-- Troubleshooting: /Users/adam/Documents/GitHub/CloudWalk_Techinical_Challenge/Build Documentation/Troubleshooting.md
-- Sprint Progress: /Users/adam/Documents/GitHub/CloudWalk_Techinical_Challenge/Build Documentation/Sprint-Progress.md
+- API Reference: /Users/adam/Documents/GitHub/llm-digit-audio-classifier_coding_challenge/Build Documentation/API-Reference.md
+- Database Schema: /Users/adam/Documents/GitHub/llm-digit-audio-classifier_coding_challenge/Build Documentation/Schemas.md
+- Project Structure: /Users/adam/Documents/GitHub/llm-digit-audio-classifier_coding_challenge/Build Documentation/structure.md
+- Troubleshooting: /Users/adam/Documents/GitHub/llm-digit-audio-classifier_coding_challenge/Build Documentation/Troubleshooting.md
+- Sprint Progress: /Users/adam/Documents/GitHub/llm-digit-audio-classifier_coding_challenge/Build Documentation/Sprint-Progress.md
 
 Environment and secrets:
 - Use .env; never commit secrets.

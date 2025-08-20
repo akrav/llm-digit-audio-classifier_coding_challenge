@@ -38,3 +38,12 @@ pytest -q
 ## Notes
 - On macOS with Python 3.13, we use `soundfile` for reading WAV and `librosa.resample` to avoid `audioread`/`aifc` issues.
 - Tests use synthetic signals; MFCC warnings were resolved by slightly increasing test clip duration to 0.3s.
+
+## Training
+Run a brief training and save artifacts:
+```
+source .venv/bin/activate
+pip install datasets huggingface_hub keras torch
+python -m src.model  # saves models/model.keras and models/model.weights.h5
+```
+If HF audio decoding is unavailable, the training entrypoint will fall back to a synthetic dataset to ensure the pipeline runs.

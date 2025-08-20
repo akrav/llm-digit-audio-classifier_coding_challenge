@@ -1,1 +1,1 @@
-Please read and execute what is written in /Users/adam/Documents/GitHub/CloudWalk_Techinical_Challenge/Cursor Ticket Prompts/Prompts/Sprint {Sprint-ID}/TICKET-{Ticket-ID} Prompt.md
+Please read and execute what is written in /Users/adam/Documents/GitHub/llm-digit-audio-classifier_coding_challenge/Cursor Ticket Prompts/Prompts/Sprint {Sprint-ID}/TICKET-{Ticket-ID} Prompt.md

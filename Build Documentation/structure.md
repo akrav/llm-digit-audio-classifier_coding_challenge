@@ -26,12 +26,16 @@ Root: llm-digit-audio-classifier_coding_challenge
   - Implementation Plan Document.md
   - Product Requirements Document.md
 - models/
+  - model.keras
+  - model.weights.h5
 - src/
   - __init__.py
   - data_processing.py
+  - model.py
 - tests/
   - conftest.py
   - test_data_processing.py
+  - test_model.py
   - test_structure.py
 - Tickets/
   - Sprint 1/
@@ -48,6 +52,7 @@ Root: llm-digit-audio-classifier_coding_challenge
     - TICKET-2002 - Model Training Script.md
     - TICKET-2003 - Initial Evaluation and Validation.md
     - TICKET-2004 - Documentation & Progress Update.md
+    - TICKET-2005 - Achieve 95%+ Test Accuracy with Regularized Optimization.md
   - Sprint 3/
     - Sprint 3 Overview.md
     - TICKET-3001 - Implement Single-Audio Inference Function.md
