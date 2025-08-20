@@ -12,3 +12,5 @@
   - Alternatively, implement path-based WAV loading if dataset provides absolute paths. The `mteb/free-spoken-digit-dataset` entries may not expose direct file paths for all records.
 - Keras weight save API requires `.weights.h5` suffix. Fixed by saving to `models/model.weights.h5`.
 
+
+- Training entrypoint may fall back to a synthetic dataset if HF decoding is unavailable.

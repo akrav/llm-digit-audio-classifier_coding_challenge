@@ -39,3 +39,10 @@
 - TICKET-2005 - Achieve 95%+ Test Accuracy with Regularized Optimization: Planned
   - Will iteratively optimize with regularization, augmentation, and proper validation
 
+
+
+- TICKET-2003 - Initial Evaluation and Validation: Completed on 2025-08-20 15:39
+  - Added evaluation step printing test accuracy via `model.evaluate()`
+
+- TICKET-2004 - Documentation & Progress Update: Completed on 2025-08-20 15:39
+  - Updated docs for Sprint 2 progress and troubleshooting notes
