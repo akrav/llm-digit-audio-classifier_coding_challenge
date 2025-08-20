@@ -1,7 +1,15 @@
 
 ### Sprint 1 Progress
 
-- TICKET-1001 - Project Setup and Initial Folder Structure: Completed on 2025-08-20 14:31
+- TICKET-1001 - Project Setup and Initial Folder Structure: Completed on 2025-08-20 14:42
   - Created folders: src/, data/, models/, tests/
   - Added files: README.md, requirements.txt, Build Documentation/*.md
   - Added sanity tests: tests/test_structure.py
+
+- TICKET-1002 - Data Loading and Resampling: Completed on 2025-08-20 14:42
+  - Implemented `src/data_processing.py::load_audio` with resampling to 8000 Hz
+  - Added tests: tests/test_data_processing.py
+
+- TICKET-1003 - MFCC Feature Extraction: Completed on 2025-08-20 14:42
+  - Implemented `extract_mfcc_features(audio, sr)` returning 40 MFCCs
+  - Added tests asserting shape `(40, num_frames)`
