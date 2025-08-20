@@ -7,4 +7,12 @@
   - **Tools**: Markdown editor.
 - **Testing**:
   - **Test Path**: Manual verification of document content.
-  - **Acceptance Criteria**: The documents are updated with accurate information from this sprint. 
+  - **Acceptance Criteria**: The documents are updated with accurate information from this sprint.
+
+---
+
+- **Status**: Completed
+  - Updated `Build Documentation/Sprint-Progress.md` with TICKET-1001 through TICKET-1005 completions and outcomes
+  - Updated `Build Documentation/Troubleshooting.md` with environment setup, audio backend notes, and warning resolution
+  - Regenerated `Build Documentation/structure.md` to reflect current repo layout
+  - Prepared `README.md` with setup (venv + install) and brief project overview 
