@@ -57,15 +57,15 @@ def pool_features(X: np.ndarray, mode: str = "mean") -> np.ndarray:
 		raise ValueError("Unknown pooling mode")
 
 
-def evaluate_saved(model_path: str, max_len: int, n_fft: int, hop_length: int, add_deltas: bool, pool: str) -> None:
-	# Load test set
-	X_test, y_test = load_fsdd_from_hf(split="test", max_len=max_len, n_fft=n_fft, hop_length=hop_length, add_deltas=add_deltas)
+def evaluate_saved(model_path: str, max_len: int, n_fft: int, hop_length: int, add_deltas: bool, pool: str, noisy: bool = False, noise_prob: float = 0.5, noise_bg_dir: str | None = None) -> None:
+	# Load test set (optionally noisy)
+	X_test, y_test = load_fsdd_from_hf(split="test", max_len=max_len, n_fft=n_fft, hop_length=hop_length, add_deltas=add_deltas, apply_waveform_noise=noisy, noise_prob=noise_prob, noise_bg_dir=noise_bg_dir)
 	Xte = pool_features(X_test, mode=pool)
 	pipe = joblib.load(model_path)
 	pred = pipe.predict(Xte)
 	acc = accuracy_score(y_test, pred)
 	print(f"Loaded: {model_path}")
-	print(f"Evaluate-only test accuracy: {acc:.4f}")
+	print(f"Evaluate-only test accuracy ({'noisy' if noisy else 'clean'}): {acc:.4f}")
 	print("Classification report:\n", classification_report(y_test, pred))
 	print("Confusion matrix:\n", confusion_matrix(y_test, pred))
 
@@ -89,15 +89,19 @@ def main():
 	parser.add_argument("--save_path", type=str, default="", help="Optional path to save fitted model (joblib)")
 	parser.add_argument("--evaluate", action="store_true", help="Load a saved model and evaluate on HF test set")
 	parser.add_argument("--eval_model_path", type=str, default="models/baseline_svm.joblib")
+	parser.add_argument("--eval_noisy", action="store_true", help="Evaluate on noisy test set")
+	parser.add_argument("--waveform_noise", action="store_true", help="Apply waveform noise augmentation on training set")
+	parser.add_argument("--noise_prob", type=float, default=0.5)
+	parser.add_argument("--noise_bg_dir", type=str, default="")
 	args = parser.parse_args()
 
 	# Evaluation-only mode
 	if args.evaluate:
-		evaluate_saved(model_path=args.eval_model_path, max_len=args.max_len, n_fft=args.n_fft, hop_length=args.hop_length, add_deltas=args.add_deltas, pool=args.pool)
+		evaluate_saved(model_path=args.eval_model_path, max_len=args.max_len, n_fft=args.n_fft, hop_length=args.hop_length, add_deltas=args.add_deltas, pool=args.pool, noisy=args.eval_noisy, noise_prob=args.noise_prob, noise_bg_dir=args.noise_bg_dir or None)
 		return
 
-	# Load features (no augmentation for baselines)
-	X_train, y_train = load_fsdd_from_hf(split="train", max_len=args.max_len, n_fft=args.n_fft, hop_length=args.hop_length, add_deltas=args.add_deltas)
+	# Load features (no augmentation for baselines, optional waveform noise for training)
+	X_train, y_train = load_fsdd_from_hf(split="train", max_len=args.max_len, n_fft=args.n_fft, hop_length=args.hop_length, add_deltas=args.add_deltas, apply_waveform_noise=args.waveform_noise, noise_prob=args.noise_prob, noise_bg_dir=args.noise_bg_dir or None)
 	X_test, y_test = load_fsdd_from_hf(split="test", max_len=args.max_len, n_fft=args.n_fft, hop_length=args.hop_length, add_deltas=args.add_deltas)
 
 	Xtr = pool_features(X_train, mode=args.pool)

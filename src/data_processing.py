@@ -143,6 +143,27 @@ def apply_specaugment(mfcc: np.ndarray, num_time_masks: int = 1, num_freq_masks:
 	return aug
 
 
+def _build_waveform_noise_augmenter(noise_prob: float = 0.5, background_dir: str | None = None):
+	"""Return an audiomentations pipeline for waveform noise if available, else None.
+	This function imports audiomentations lazily to avoid hard dependency at import time.
+	"""
+	try:
+		from audiomentations import Compose, AddGaussianNoise
+		transforms: List = [
+			AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.015, p=noise_prob),
+		]
+		# Optional background noise if directory is provided
+		if background_dir and os.path.isdir(background_dir):
+			try:
+				from audiomentations import AddBackgroundNoise
+				transforms.append(AddBackgroundNoise(sounds_path=background_dir, p=min(0.3, noise_prob)))
+			except Exception:
+				pass
+		return Compose(transforms)
+	except Exception:
+		return None
+
+
 def preprocess_audio_to_features(
 	audio: np.ndarray,
 	sr: int,
@@ -188,7 +209,7 @@ def _hf_download_audio(filename: str) -> str:
 	return hf_hub_download(repo_id=HF_FSDD_REPO, filename=filename, repo_type="dataset")
 
 
-def load_fsdd_from_hf(split: str = "train", max_len: int = 200, n_fft: int = 512, hop_length: int = 128, add_deltas: bool = False, apply_augmentation: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+def load_fsdd_from_hf(split: str = "train", max_len: int = 200, n_fft: int = 512, hop_length: int = 128, add_deltas: bool = False, apply_augmentation: bool = False, apply_waveform_noise: bool = False, noise_prob: float = 0.5, noise_bg_dir: str | None = None) -> Tuple[np.ndarray, np.ndarray]:
 	"""Load FSDD from Hugging Face and preprocess into arrays.
 
 	Dataset: mteb/free-spoken-digit-dataset
@@ -204,6 +225,9 @@ def load_fsdd_from_hf(split: str = "train", max_len: int = 200, n_fft: int = 512
 	# Prefer decoding to arrays now that torchcodec is available; keep path fallback as secondary
 	if "audio" in ds.features and isinstance(ds.features["audio"], Audio.__mro__[0]):
 		ds = ds.cast_column("audio", Audio(decode=True))
+
+	# Build waveform noise augmenter if requested
+	augmenter = _build_waveform_noise_augmenter(noise_prob=noise_prob, background_dir=noise_bg_dir) if apply_waveform_noise else None
 
 	features_list: List[np.ndarray] = []
 	labels_list: List[int] = []
@@ -221,7 +245,6 @@ def load_fsdd_from_hf(split: str = "train", max_len: int = 200, n_fft: int = 512
 		# Prefer decoded samples via torchcodec
 		if "audio" in ex and hasattr(ex["audio"], "get_all_samples"):
 			samples = ex["audio"].get_all_samples()
-			# samples.data is a torch.Tensor shaped (channels, num_samples)
 			try:
 				import torch  # noqa: F401
 				np_audio = samples.data.numpy()
@@ -234,8 +257,8 @@ def load_fsdd_from_hf(split: str = "train", max_len: int = 200, n_fft: int = 512
 				np_audio = np_audio.squeeze(0)
 			sr = int(samples.sample_rate)
 			if sr != TARGET_SAMPLE_RATE:
-				np_audio = librosa.resample(y=np_audio, orig_sr=sr, target_sr=TARGET_SAMPLE_RATE)
-			feat = preprocess_audio_to_features(np_audio.astype(np.float32, copy=False), TARGET_SAMPLE_RATE, max_len=max_len, n_fft=n_fft, hop_length=hop_length, add_deltas=add_deltas, apply_augmentation=apply_augmentation and split=="train")
+				np_audio = librosa.resample(y=np_audio.astype(np.float32, copy=False), orig_sr=sr, target_sr=TARGET_SAMPLE_RATE)
+			audio_arr = np.asarray(np_audio, dtype=np.float32)
 		else:
 			# Load via file path; if relative, download via HF hub
 			path = None
@@ -247,8 +270,16 @@ def load_fsdd_from_hf(split: str = "train", max_len: int = 200, n_fft: int = 512
 				raise KeyError("Example missing audio path")
 			if not os.path.isabs(path) or not os.path.isfile(path):
 				path = _hf_download_audio(os.path.basename(path))
-			audio, _ = load_audio(path)
-			feat = preprocess_audio_to_features(audio, TARGET_SAMPLE_RATE, max_len=max_len, n_fft=n_fft, hop_length=hop_length, add_deltas=add_deltas, apply_augmentation=apply_augmentation and split=="train")
+			audio_arr, _ = load_audio(path)
+
+		# Apply optional waveform noise (train split by default)
+		if augmenter is not None:
+			try:
+				audio_arr = augmenter(samples=audio_arr, sample_rate=TARGET_SAMPLE_RATE)
+			except Exception:
+				pass
+
+		feat = preprocess_audio_to_features(audio_arr.astype(np.float32, copy=False), TARGET_SAMPLE_RATE, max_len=max_len, n_fft=n_fft, hop_length=hop_length, add_deltas=add_deltas, apply_augmentation=apply_augmentation and split=="train")
 
 		features_list.append(feat)
 		labels_list.append(label)
