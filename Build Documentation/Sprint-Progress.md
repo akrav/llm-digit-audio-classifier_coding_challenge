@@ -46,3 +46,22 @@
 
 - TICKET-2004 - Documentation & Progress Update: Completed on 2025-08-20 15:39
   - Updated docs for Sprint 2 progress and troubleshooting notes
+
+### Sprint 3 Progress
+
+- TICKET-3001 - Implement Single-Audio Inference Function: Completed
+  - Added `src/inference.py::predict_single_audio` and HF dataset flags (`--hf_idx`, `--hf_split`)
+  - Baseline pipeline used; returns a single digit for a given audio
+
+- TICKET-3002 - Implement Latency Measurement: Completed
+  - Added warm-up and repeated timing with `perf_counter()` in `src/inference.py`
+  - Reports avg and p95 latency in ms and prints per-run timings
+
+- TICKET-3003 - Implement Confusion Matrix & Detailed Metrics: Completed
+  - Added evaluate-only mode to `src/baseline.py` to print classification report and confusion matrix
+
+- TICKET-3004 - Create Main Execution Script: Completed
+  - Created `src/main.py` with `--train`, `--evaluate`, and `--predict` (local path or `--hf_idx`) modes
+
+- TICKET-3005 - Final Documentation & Progress Update: Completed
+  - Updated README with baseline artifact and usage, structure, and troubleshooting notes

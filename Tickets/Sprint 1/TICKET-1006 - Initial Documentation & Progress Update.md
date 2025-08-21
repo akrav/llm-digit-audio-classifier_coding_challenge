@@ -7,7 +7,7 @@
   - **Tools**: Markdown editor.
 - **Testing**:
   - **Test Path**: Manual verification of document content.
-  - **Acceptance Criteria**: The documents are updated with accurate information from this sprint.
+  - **Acceptance Criteria**: The documents are updated with accurate information from this sprint. 
 
 ---
 

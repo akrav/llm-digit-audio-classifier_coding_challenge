@@ -51,16 +51,17 @@ def load_audio(file_path: str) -> Tuple[np.ndarray, int]:
 	return audio, TARGET_SAMPLE_RATE
 
 
-def extract_mfcc_features(audio: np.ndarray, sr: int, n_mfcc: int = 40) -> np.ndarray:
-	"""Extract MFCC features from 1D audio.
+def extract_mfcc_features(
+	audio: np.ndarray,
+	sr: int,
+	n_mfcc: int = 40,
+	n_fft: int = 512,
+	hop_length: int = 128,
+	add_deltas: bool = False,
+) -> np.ndarray:
+	"""Extract MFCC (optionally with deltas) from 1D audio using params suited for 8 kHz.
 
-	Args:
-		audio: Mono audio signal as float32 numpy array.
-		sr: Sample rate of the audio.
-		n_mfcc: Number of MFCC coefficients to compute.
-
-	Returns:
-		MFCC feature array of shape (n_mfcc, num_frames), dtype float32.
+	Returns shape (n_mfcc[, * (1 or 3)], num_frames) as float32.
 	"""
 	if audio is None or (isinstance(audio, np.ndarray) and audio.size == 0):
 		raise ValueError("Audio is empty; cannot extract MFCC features")
@@ -72,7 +73,11 @@ def extract_mfcc_features(audio: np.ndarray, sr: int, n_mfcc: int = 40) -> np.nd
 		audio = np.mean(audio, axis=1)
 	audio = audio.astype(np.float32, copy=False)
 
-	mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=n_mfcc)
+	mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=n_mfcc, n_fft=n_fft, hop_length=hop_length)
+	if add_deltas:
+		d1 = librosa.feature.delta(mfcc)
+		d2 = librosa.feature.delta(mfcc, order=2)
+		mfcc = np.concatenate([mfcc, d1, d2], axis=0)
 	return mfcc.astype(np.float32, copy=False)
 
 
@@ -80,20 +85,20 @@ def pad_features(mfcc_array: np.ndarray, max_len: int) -> np.ndarray:
 	"""Pad or truncate MFCC array to a fixed number of frames.
 
 	Args:
-		mfcc_array: MFCCs shaped (n_mfcc, num_frames).
+		mfcc_array: MFCCs shaped (n_feats, num_frames).
 		max_len: Desired number of frames after padding/truncation.
 
 	Returns:
-		Array shaped (n_mfcc, max_len), zero-padded at the end if needed.
+		Array shaped (n_feats, max_len), zero-padded at the end if needed.
 	"""
 	if mfcc_array is None or mfcc_array.size == 0:
 		raise ValueError("MFCC array is empty; cannot pad")
 	if max_len <= 0:
 		raise ValueError("max_len must be positive")
 	if mfcc_array.ndim != 2:
-		raise ValueError("mfcc_array must have shape (n_mfcc, num_frames)")
+		raise ValueError("mfcc_array must have shape (n_feats, num_frames)")
 
-	n_mfcc, num_frames = mfcc_array.shape
+	n_feats, num_frames = mfcc_array.shape
 	if num_frames == max_len:
 		return mfcc_array.astype(np.float32, copy=False)
 	elif num_frames > max_len:
@@ -105,43 +110,64 @@ def pad_features(mfcc_array: np.ndarray, max_len: int) -> np.ndarray:
 
 
 def normalize_features(features: np.ndarray) -> np.ndarray:
-	"""Normalize features to ~0 mean and ~1 std per coefficient.
-
-	Treats time frames as samples and MFCC coefficients as features.
-
-	Args:
-		features: Array shaped (n_mfcc, num_frames).
-
-	Returns:
-		Array of same shape, normalized per coefficient.
-	"""
+	"""Normalize features to ~0 mean and ~1 std per coefficient (over time frames)."""
 	if features is None or features.size == 0:
 		raise ValueError("features array is empty; cannot normalize")
 	if features.ndim != 2:
-		raise ValueError("features must have shape (n_mfcc, num_frames)")
+		raise ValueError("features must have shape (n_feats, num_frames)")
 
-	# Transpose to (num_frames, n_mfcc) for sklearn
+	# Transpose to (num_frames, n_feats) for sklearn
 	X = features.T.astype(np.float32, copy=False)
 	scaler = StandardScaler()
 	Xn = scaler.fit_transform(X)
 	return Xn.T.astype(np.float32, copy=False)
 
 
-def preprocess_audio_to_features(audio: np.ndarray, sr: int, max_len: int = 200) -> np.ndarray:
-	"""Full preprocessing for one audio clip: MFCC -> pad -> normalize.
+def apply_specaugment(mfcc: np.ndarray, num_time_masks: int = 1, num_freq_masks: int = 1, time_mask_width: int = 20, freq_mask_width: int = 4) -> np.ndarray:
+	"""Apply simple SpecAugment-style time and frequency masking on MFCCs.
 
-	Returns array of shape (40, max_len).
+	mfcc: (n_feats, T)
 	"""
-	mfcc = extract_mfcc_features(audio, sr, n_mfcc=40)
+	aug = mfcc.copy()
+	n_feats, T = aug.shape
+	if num_time_masks > 0 and T > 0:
+		for _ in range(num_time_masks):
+			w = min(time_mask_width, T)
+			start = np.random.randint(0, max(1, T - w + 1))
+			aug[:, start:start + w] = 0.0
+	if num_freq_masks > 0 and n_feats > 0:
+		for _ in range(num_freq_masks):
+			w = min(freq_mask_width, n_feats)
+			start = np.random.randint(0, max(1, n_feats - w + 1))
+			aug[start:start + w, :] = 0.0
+	return aug
+
+
+def preprocess_audio_to_features(
+	audio: np.ndarray,
+	sr: int,
+	max_len: int = 200,
+	n_fft: int = 512,
+	hop_length: int = 128,
+	add_deltas: bool = False,
+	apply_augmentation: bool = False,
+) -> np.ndarray:
+	"""Full preprocessing for one audio clip: MFCC -> pad -> (optional SpecAugment) -> normalize.
+
+	Returns array of shape (n_feats, max_len).
+	"""
+	mfcc = extract_mfcc_features(audio, sr, n_mfcc=40, n_fft=n_fft, hop_length=hop_length, add_deltas=add_deltas)
 	mfcc_padded = pad_features(mfcc, max_len=max_len)
+	if apply_augmentation:
+		mfcc_padded = apply_specaugment(mfcc_padded)
 	mfcc_norm = normalize_features(mfcc_padded)
 	return mfcc_norm
 
 
-def generate_dataset_from_filepaths(filepaths: Sequence[str], labels: Sequence[int], max_len: int = 200) -> Tuple[np.ndarray, np.ndarray]:
+def generate_dataset_from_filepaths(filepaths: Sequence[str], labels: Sequence[int], max_len: int = 200, n_fft: int = 512, hop_length: int = 128, add_deltas: bool = False, apply_augmentation: bool = False) -> Tuple[np.ndarray, np.ndarray]:
 	"""Process a list of local filepaths into features and labels arrays.
 
-	Returns X shape (N, 40, max_len), y shape (N,).
+	Returns X shape (N, n_feats, max_len), y shape (N,).
 	"""
 	if len(filepaths) != len(labels):
 		raise ValueError("filepaths and labels must have the same length")
@@ -149,7 +175,7 @@ def generate_dataset_from_filepaths(filepaths: Sequence[str], labels: Sequence[i
 	features_list: List[np.ndarray] = []
 	for p in filepaths:
 		audio, sr = load_audio(p)
-		features_list.append(preprocess_audio_to_features(audio, sr, max_len=max_len))
+		features_list.append(preprocess_audio_to_features(audio, sr, max_len=max_len, n_fft=n_fft, hop_length=hop_length, add_deltas=add_deltas, apply_augmentation=apply_augmentation))
 
 	X = np.stack(features_list, axis=0).astype(np.float32)
 	y = np.asarray(labels, dtype=np.int64)
@@ -162,7 +188,7 @@ def _hf_download_audio(filename: str) -> str:
 	return hf_hub_download(repo_id=HF_FSDD_REPO, filename=filename, repo_type="dataset")
 
 
-def load_fsdd_from_hf(split: str = "train", max_len: int = 200) -> Tuple[np.ndarray, np.ndarray]:
+def load_fsdd_from_hf(split: str = "train", max_len: int = 200, n_fft: int = 512, hop_length: int = 128, add_deltas: bool = False, apply_augmentation: bool = False) -> Tuple[np.ndarray, np.ndarray]:
 	"""Load FSDD from Hugging Face and preprocess into arrays.
 
 	Dataset: mteb/free-spoken-digit-dataset
@@ -192,13 +218,24 @@ def load_fsdd_from_hf(split: str = "train", max_len: int = 200) -> Tuple[np.ndar
 		if label is None:
 			raise KeyError("Could not find label field in dataset example")
 
-		# Prefer decoded array if available
-		if "audio" in ex and isinstance(ex["audio"], dict) and "array" in ex["audio"] and "sampling_rate" in ex["audio"]:
-			audio = np.asarray(ex["audio"]["array"], dtype=np.float32)
-			sr = int(ex["audio"]["sampling_rate"])
+		# Prefer decoded samples via torchcodec
+		if "audio" in ex and hasattr(ex["audio"], "get_all_samples"):
+			samples = ex["audio"].get_all_samples()
+			# samples.data is a torch.Tensor shaped (channels, num_samples)
+			try:
+				import torch  # noqa: F401
+				np_audio = samples.data.numpy()
+			except Exception:
+				np_audio = samples.data.detach().cpu().numpy()
+			# Convert to mono if multi-channel
+			if np_audio.ndim == 2 and np_audio.shape[0] > 1:
+				np_audio = np.mean(np_audio, axis=0)
+			else:
+				np_audio = np_audio.squeeze(0)
+			sr = int(samples.sample_rate)
 			if sr != TARGET_SAMPLE_RATE:
-				audio = librosa.resample(y=audio, orig_sr=sr, target_sr=TARGET_SAMPLE_RATE)
-			feat = preprocess_audio_to_features(audio, TARGET_SAMPLE_RATE, max_len=max_len)
+				np_audio = librosa.resample(y=np_audio, orig_sr=sr, target_sr=TARGET_SAMPLE_RATE)
+			feat = preprocess_audio_to_features(np_audio.astype(np.float32, copy=False), TARGET_SAMPLE_RATE, max_len=max_len, n_fft=n_fft, hop_length=hop_length, add_deltas=add_deltas, apply_augmentation=apply_augmentation and split=="train")
 		else:
 			# Load via file path; if relative, download via HF hub
 			path = None
@@ -209,10 +246,9 @@ def load_fsdd_from_hf(split: str = "train", max_len: int = 200) -> Tuple[np.ndar
 			if not path:
 				raise KeyError("Example missing audio path")
 			if not os.path.isabs(path) or not os.path.isfile(path):
-				# Attempt to download the file by filename from the dataset repo
 				path = _hf_download_audio(os.path.basename(path))
 			audio, _ = load_audio(path)
-			feat = preprocess_audio_to_features(audio, TARGET_SAMPLE_RATE, max_len=max_len)
+			feat = preprocess_audio_to_features(audio, TARGET_SAMPLE_RATE, max_len=max_len, n_fft=n_fft, hop_length=hop_length, add_deltas=add_deltas, apply_augmentation=apply_augmentation and split=="train")
 
 		features_list.append(feat)
 		labels_list.append(label)

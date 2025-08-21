@@ -28,10 +28,15 @@ Root: llm-digit-audio-classifier_coding_challenge
 - models/
   - model.keras
   - model.weights.h5
+  - baseline_svm.joblib
 - src/
   - __init__.py
   - data_processing.py
   - model.py
+  - baseline.py
+  - inference.py
+  - train.py
+  - main.py
 - tests/
   - conftest.py
   - test_data_processing.py

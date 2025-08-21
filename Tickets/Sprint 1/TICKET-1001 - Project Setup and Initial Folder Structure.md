@@ -8,7 +8,7 @@
   - **Tools**: Git, your code editor.
 - **Testing**:
   - **Test Path**: Manually verify that the folder structure and files are created as specified.
-  - **Acceptance Criteria**: The project directory is correctly structured.
+  - **Acceptance Criteria**: The project directory is correctly structured. 
 
 ---
 

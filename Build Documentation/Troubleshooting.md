@@ -14,3 +14,12 @@
 
 
 - Training entrypoint may fall back to a synthetic dataset if HF decoding is unavailable.
+
+### Sprint 3 Notes
+
+- Inference without local WAV files:
+  - Use `src.inference` with `--hf_idx` and `--hf_split` to fetch directly from FSDD on Hugging Face when local paths are unavailable.
+  - Example: `python -m src.inference --model models/baseline_svm.joblib --hf_split test --hf_idx 0 --add_deltas --pool flat`
+- Latency measurement:
+  - `src.inference` supports `--warmup` and `--runs` and reports avg and p95 latency in milliseconds.
+  - Timing only covers model prediction on precomputed features to reflect inference cost, not I/O.
