@@ -93,6 +93,8 @@ def main():
 	parser.add_argument("--waveform_noise", action="store_true", help="Apply waveform noise augmentation on training set")
 	parser.add_argument("--noise_prob", type=float, default=0.5)
 	parser.add_argument("--noise_bg_dir", type=str, default="")
+	parser.add_argument("--augment_copies", type=int, default=0, help="Number of extra augmented copies per training sample")
+	parser.add_argument("--augment_types", type=str, default="gauss,bg", help="Comma-separated augment kinds: gauss,bg,pitch")
 	args = parser.parse_args()
 
 	# Evaluation-only mode
@@ -101,7 +103,7 @@ def main():
 		return
 
 	# Load features (no augmentation for baselines, optional waveform noise for training)
-	X_train, y_train = load_fsdd_from_hf(split="train", max_len=args.max_len, n_fft=args.n_fft, hop_length=args.hop_length, add_deltas=args.add_deltas, apply_waveform_noise=args.waveform_noise, noise_prob=args.noise_prob, noise_bg_dir=args.noise_bg_dir or None)
+	X_train, y_train = load_fsdd_from_hf(split="train", max_len=args.max_len, n_fft=args.n_fft, hop_length=args.hop_length, add_deltas=args.add_deltas, apply_waveform_noise=args.waveform_noise, noise_prob=args.noise_prob, noise_bg_dir=args.noise_bg_dir or None, augment_copies=args.augment_copies, augment_types=args.augment_types)
 	X_test, y_test = load_fsdd_from_hf(split="test", max_len=args.max_len, n_fft=args.n_fft, hop_length=args.hop_length, add_deltas=args.add_deltas)
 
 	Xtr = pool_features(X_train, mode=args.pool)

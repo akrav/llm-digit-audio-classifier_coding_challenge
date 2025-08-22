@@ -132,6 +132,131 @@ def build_cnn_model(
 	return model
 
 
+def _se_block(x: layers.Layer, se_ratio: float = 0.25) -> layers.Layer:
+	"""Squeeze-and-Excitation block.
+
+	Args:
+		x: input tensor with channels-last format.
+		se_ratio: reduction ratio for squeeze.
+	"""
+	c = x.shape[-1]
+	s = layers.GlobalAveragePooling2D(keepdims=True)(x)
+	s = layers.Conv2D(max(1, int(c * se_ratio)), kernel_size=1, activation="relu")(s)
+	s = layers.Conv2D(int(c), kernel_size=1, activation="sigmoid")(s)
+	return layers.Multiply()([x, s])
+
+
+def _dw_sep_block(
+	x: layers.Layer,
+	pointwise_filters: int,
+	stride: int = 1,
+	use_batchnorm: bool = True,
+	l2_weight: float = 0.0,
+	activation_name: str = "relu",
+	use_se: bool = True,
+	se_ratio: float = 0.25,
+) -> layers.Layer:
+	"""Depthwise-separable conv block with optional SE and BN."""
+	kernel_reg = regularizers.l2(l2_weight) if l2_weight > 0 else None
+	# Depthwise
+	x = layers.DepthwiseConv2D(kernel_size=3, strides=stride, padding="same", depthwise_regularizer=kernel_reg, depthwise_initializer="he_normal")(x)
+	if use_batchnorm:
+		x = layers.BatchNormalization()(x)
+	x = _apply_activation(x, activation_name)
+	# Pointwise
+	x = layers.Conv2D(pointwise_filters, kernel_size=1, padding="same", activation=None, kernel_regularizer=kernel_reg, kernel_initializer="he_normal")(x)
+	if use_batchnorm:
+		x = layers.BatchNormalization()(x)
+	x = _apply_activation(x, activation_name)
+	# SE
+	if use_se:
+		x = _se_block(x, se_ratio=se_ratio)
+	return x
+
+
+def build_small_cnn(
+	input_shape: Tuple[int, int, int],
+	num_classes: int,
+	depth_multiplier: float = 1.0,
+	use_batchnorm: bool = True,
+	use_se: bool = True,
+	se_ratio: float = 0.25,
+	dropout_rate: float = 0.3,
+	l2_weight: float = 1e-4,
+	activation_name: str = "relu",
+	learning_rate: float = 1e-3,
+) -> keras.Model:
+	"""Small SOTA-ish CNN for MFCCs using depthwise-separable blocks + SE + GAP.
+
+	Keeps params small and trains faster than a plain CNN while maintaining accuracy.
+	"""
+	if len(input_shape) != 3:
+		raise ValueError("input_shape must be a 3-tuple (height, width, channels)")
+	if num_classes <= 0:
+		raise ValueError("num_classes must be positive")
+
+	kernel_reg = regularizers.l2(l2_weight) if l2_weight > 0 else None
+
+	def ch(n: int) -> int:
+		return max(8, int(round(n * depth_multiplier)))
+
+	inputs = layers.Input(shape=input_shape)
+	# Stem
+	x = layers.Conv2D(ch(16), 3, padding="same", activation=None, kernel_regularizer=kernel_reg, kernel_initializer="he_normal")(inputs)
+	if use_batchnorm:
+		x = layers.BatchNormalization()(x)
+	x = _apply_activation(x, activation_name)
+
+	# Stages
+	x = _dw_sep_block(x, ch(24), stride=2, use_batchnorm=use_batchnorm, l2_weight=l2_weight, activation_name=activation_name, use_se=use_se, se_ratio=se_ratio)
+	x = _dw_sep_block(x, ch(32), stride=2, use_batchnorm=use_batchnorm, l2_weight=l2_weight, activation_name=activation_name, use_se=use_se, se_ratio=se_ratio)
+	x = _dw_sep_block(x, ch(48), stride=2, use_batchnorm=use_batchnorm, l2_weight=l2_weight, activation_name=activation_name, use_se=use_se, se_ratio=se_ratio)
+	x = _dw_sep_block(x, ch(64), stride=2, use_batchnorm=use_batchnorm, l2_weight=l2_weight, activation_name=activation_name, use_se=use_se, se_ratio=se_ratio)
+
+	# Head
+	x = layers.GlobalAveragePooling2D()(x)
+	if dropout_rate and dropout_rate > 0:
+		x = layers.Dropout(dropout_rate)(x)
+	out = layers.Dense(num_classes, activation="softmax", kernel_regularizer=kernel_reg)(x)
+
+	model = models.Model(inputs=inputs, outputs=out, name="small_cnn")
+	opt = optimizers.Adam(learning_rate=learning_rate)
+	model.compile(optimizer=opt, loss=losses.SparseCategoricalCrossentropy(), metrics=["accuracy"])
+	return model
+
+
+def build_cs230_cnn(
+	input_shape: Tuple[int, int, int],
+	num_classes: int = 10,
+	use_pool: bool = True,
+	learning_rate: float = 1e-6,
+) -> keras.Model:
+	"""CS230-style CNN: Conv5x5 → ReLU → (Pool) → Conv5x5 → ReLU → (Pool) → Flatten → Dense(1000) → Softmax.
+
+	Uses MFCC matrix as input proxy for spectrogram.
+	"""
+	if len(input_shape) != 3:
+		raise ValueError("input_shape must be a 3-tuple (height, width, channels)")
+	if num_classes <= 0:
+		raise ValueError("num_classes must be positive")
+
+	inputs = layers.Input(shape=input_shape)
+	x = layers.Conv2D(5, kernel_size=(5, 5), padding="same", activation="relu")(inputs)
+	if use_pool:
+		x = layers.MaxPooling2D(pool_size=(2, 2))(x)
+	x = layers.Conv2D(10, kernel_size=(5, 5), padding="same", activation="relu")(x)
+	if use_pool:
+		x = layers.MaxPooling2D(pool_size=(2, 2))(x)
+	x = layers.Flatten()(x)
+	x = layers.Dense(1000, activation="relu")(x)
+	outputs = layers.Dense(num_classes, activation="softmax")(x)
+
+	model = models.Model(inputs=inputs, outputs=outputs, name="cs230_cnn")
+	opt = optimizers.Adam(learning_rate=learning_rate)
+	model.compile(optimizer=opt, loss=losses.SparseCategoricalCrossentropy(), metrics=["accuracy"])
+	return model
+
+
 def _load_local_npy() -> tuple:
 	"""Try loading pre-generated numpy arrays from data/ directory."""
 	X_train_path = os.path.join("data", "X_train.npy")
@@ -331,15 +456,14 @@ if __name__ == "__main__":
 	import argparse
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--cv", action="store_true", help="Run 10-fold CV hyperparameter search")
-	parser.add_argument("--epochs", type=int, default=20)
-	parser.add_argument("--batch_size", type=int, default=64)
+	parser.add_argument("--epochs", type=int, default=40)
+	parser.add_argument("--batch_size", type=int, default=32)
 	parser.add_argument("--max_len", type=int, default=200)
 	parser.add_argument("--add_deltas", action="store_true")
-	parser.add_argument("--folds", type=int, default=8)
 	args = parser.parse_args()
 
 	if args.cv:
-		result = kfold_cv_search(max_len=args.max_len, n_splits=args.folds, epochs=args.epochs, batch_size=args.batch_size, add_deltas=args.add_deltas)
+		result = kfold_cv_search(max_len=args.max_len, n_splits=10, epochs=args.epochs, batch_size=args.batch_size, add_deltas=args.add_deltas)
 		print(result)
 	else:
 		train_and_save_model(max_len=args.max_len, epochs=args.epochs, batch_size=args.batch_size) 

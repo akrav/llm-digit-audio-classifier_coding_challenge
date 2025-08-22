@@ -5,6 +5,7 @@ import librosa
 import numpy as np
 import soundfile as sf
 from sklearn.preprocessing import StandardScaler
+from hashlib import md5
 
 TARGET_SAMPLE_RATE = 8000
 
@@ -209,12 +210,55 @@ def _hf_download_audio(filename: str) -> str:
 	return hf_hub_download(repo_id=HF_FSDD_REPO, filename=filename, repo_type="dataset")
 
 
-def load_fsdd_from_hf(split: str = "train", max_len: int = 200, n_fft: int = 512, hop_length: int = 128, add_deltas: bool = False, apply_augmentation: bool = False, apply_waveform_noise: bool = False, noise_prob: float = 0.5, noise_bg_dir: str | None = None) -> Tuple[np.ndarray, np.ndarray]:
-	"""Load FSDD from Hugging Face and preprocess into arrays.
+def _make_cache_key(split: str, max_len: int, n_fft: int, hop_length: int, add_deltas: bool, apply_augmentation: bool, apply_waveform_noise: bool, noise_prob: float, noise_bg_dir: str | None) -> str:
+	payload = f"{split}|{max_len}|{n_fft}|{hop_length}|{int(add_deltas)}|{int(apply_augmentation)}|{int(apply_waveform_noise)}|{noise_prob}|{noise_bg_dir or ''}"
+	return md5(payload.encode("utf-8")).hexdigest()[:12]
 
-	Dataset: mteb/free-spoken-digit-dataset
-	Split: 'train' or 'test'
+
+def _cache_paths(cache_dir: str, split: str, key: str) -> tuple[str, str]:
+	os.makedirs(cache_dir, exist_ok=True)
+	base = os.path.join(cache_dir, f"fsdd_{split}_mfcc_{key}.npz")
+	return base, base  # single file for (X, y)
+
+
+# Update signature to include caching flags (kept defaults to not break callers)
+def load_fsdd_from_hf(
+	split: str = "train",
+	max_len: int = 200,
+	n_fft: int = 512,
+	hop_length: int = 128,
+	add_deltas: bool = False,
+	apply_augmentation: bool = False,
+	apply_waveform_noise: bool = False,
+	noise_prob: float = 0.5,
+	noise_bg_dir: str | None = None,
+	augment_copies: int = 0,
+	augment_types: str = "gauss,bg",
+	use_cache: bool = False,
+	cache_dir: str = "data/cache",
+) -> tuple[np.ndarray, np.ndarray]:
+	"""Load FSDD split from HF, preprocess to MFCC features, optionally cache to disk.
+
+	Returns
+	-------
+	X : np.ndarray, shape (N, F, T)
+		Preprocessed MFCC features (without channel dim)
+	y : np.ndarray, shape (N,)
+		Integer labels 0-9
 	"""
+	# Try cache hit
+	if use_cache:
+		key = _make_cache_key(split, max_len, n_fft, hop_length, add_deltas, apply_augmentation, apply_waveform_noise, noise_prob, noise_bg_dir)
+		cache_path, _ = _cache_paths(cache_dir, split, key)
+		if os.path.exists(cache_path):
+			try:
+				loaded = np.load(cache_path)
+				X = loaded["X"]
+				y = loaded["y"]
+				return X, y
+			except Exception:
+				pass
+
 	try:
 		from datasets import load_dataset
 		from datasets.features import Audio
@@ -228,6 +272,21 @@ def load_fsdd_from_hf(split: str = "train", max_len: int = 200, n_fft: int = 512
 
 	# Build waveform noise augmenter if requested
 	augmenter = _build_waveform_noise_augmenter(noise_prob=noise_prob, background_dir=noise_bg_dir) if apply_waveform_noise else None
+
+	# Prepare additional augmentation builders
+	aug_kinds = [s.strip() for s in augment_types.split(',') if s.strip()] if augment_types else []
+	def _build_extra(kind: str):
+		try:
+			from audiomentations import Compose, AddGaussianNoise, AddBackgroundNoise, TimeMask, FrequencyMask, PitchShift
+			if kind == 'gauss':
+				return Compose([AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.02, p=1.0)])
+			if kind == 'bg' and noise_bg_dir and os.path.isdir(noise_bg_dir):
+				return Compose([AddBackgroundNoise(sounds_path=noise_bg_dir, p=1.0)])
+			if kind == 'pitch':
+				return Compose([PitchShift(min_semitones=-2, max_semitones=2, p=1.0)])
+			return None
+		except Exception:
+			return None
 
 	features_list: List[np.ndarray] = []
 	labels_list: List[int] = []
@@ -272,18 +331,39 @@ def load_fsdd_from_hf(split: str = "train", max_len: int = 200, n_fft: int = 512
 				path = _hf_download_audio(os.path.basename(path))
 			audio_arr, _ = load_audio(path)
 
-		# Apply optional waveform noise (train split by default)
-		if augmenter is not None:
+		def _process_add(audio_wave: np.ndarray):
+			feat = preprocess_audio_to_features(audio_wave.astype(np.float32, copy=False), TARGET_SAMPLE_RATE, max_len=max_len, n_fft=n_fft, hop_length=hop_length, add_deltas=add_deltas, apply_augmentation=apply_augmentation and split=="train")
+			features_list.append(feat)
+			labels_list.append(label)
+
+		# Original (optionally with waveform noise)
+		base_wave = audio_arr
+		if augmenter is not None and split == 'train':
 			try:
-				audio_arr = augmenter(samples=audio_arr, sample_rate=TARGET_SAMPLE_RATE)
+				base_wave = augmenter(samples=audio_arr, sample_rate=TARGET_SAMPLE_RATE)
 			except Exception:
 				pass
+		_process_add(base_wave)
 
-		feat = preprocess_audio_to_features(audio_arr.astype(np.float32, copy=False), TARGET_SAMPLE_RATE, max_len=max_len, n_fft=n_fft, hop_length=hop_length, add_deltas=add_deltas, apply_augmentation=apply_augmentation and split=="train")
-
-		features_list.append(feat)
-		labels_list.append(label)
+		# Extra augmented copies
+		if split == 'train' and augment_copies > 0:
+			for i in range(augment_copies):
+				for kind in aug_kinds:
+					extra_aug = _build_extra(kind)
+					if extra_aug is None:
+						continue
+					try:
+						aug_wave = extra_aug(samples=audio_arr, sample_rate=TARGET_SAMPLE_RATE)
+						_process_add(aug_wave)
+					except Exception:
+						continue
 
 	X = np.stack(features_list, axis=0).astype(np.float32)
 	y = np.asarray(labels_list, dtype=np.int64)
+
+	# Save cache on miss
+	if use_cache:
+		os.makedirs(cache_dir, exist_ok=True)
+		np.savez_compressed(cache_path, X=X, y=y)
+
 	return X, y 

@@ -1,0 +1,2 @@
+idx,learning_rate,use_pool,mean_acc,std_acc
+1,1e-06,True,0.6259259343147278,0.01622881419108303
