@@ -16,6 +16,7 @@ The code is organized to make setup, training, evaluation, single-file inference
 
 #### Extra Notes:
 - Cross Validation and Grid Search were implemented to evaluate and find the best model tuning.
+- Early Stopping was implemented to avoid overfitting.
 - Wav2Vec2 is a model that uses 16kHz audio data, to handle this case I convert the 8kHz input data in the preprocessing step to 16kHz and then predict
 
 ## 1) Setup
