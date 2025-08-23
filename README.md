@@ -208,9 +208,11 @@ python -m src.live_inference --arch wav2vec2 --w2v_dir models/wav2vec2_digits \
   - F1 0.9967
 
 Confusion matrices:
-
+### Baseline Confusion Matrix
 ![Baseline CM](models/logs/confusion_matrix_baseline.png)
+### Custom TensorFlow CNN Confusion Matrix
 ![Keras CM](models/logs/confusion_matrix_keras.png)
+### Wav2Vec2 Confusion Matrix
 ![Wav2Vec2 CM](models/logs/confusion_matrix_wav2vec2.png)
 
 
