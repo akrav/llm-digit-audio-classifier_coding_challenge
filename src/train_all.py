@@ -98,7 +98,7 @@ def train_keras(save_path: str, max_len: int, n_fft: int, hop: int, add_deltas: 
 	import keras
 	from keras import callbacks
 	from sklearn.model_selection import StratifiedKFold
-	from src.model import build_cs230_cnn
+	from src.model import build_Custom_cnn
 	X, y = load_fsdd_from_hf(split='train', max_len=max_len, n_fft=n_fft, hop_length=hop, add_deltas=add_deltas, apply_augmentation=False, use_cache=True, cache_dir='data/cache')
 	X_in = X[..., np.newaxis]
 	input_shape = (X_in.shape[1], X_in.shape[2], X_in.shape[3])
@@ -108,7 +108,7 @@ def train_keras(save_path: str, max_len: int, n_fft: int, hop: int, add_deltas: 
 		kf = StratifiedKFold(n_splits=max(2, cv_folds), shuffle=True, random_state=42)
 		accs: List[float] = []
 		for i, (tr, va) in enumerate(kf.split(X_in, y), start=1):
-			model = build_cs230_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=1e-6)
+			model = build_Custom_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=1e-6)
 			cbs = [
 				callbacks.EarlyStopping(monitor='val_accuracy', mode='max', patience=5, restore_best_weights=True),
 				callbacks.ReduceLROnPlateau(monitor='val_accuracy', mode='max', factor=0.5, patience=2, min_lr=1e-6),
@@ -117,7 +117,7 @@ def train_keras(save_path: str, max_len: int, n_fft: int, hop: int, add_deltas: 
 			_save_curves(h, logs, f'keras_cv_fold{i}')
 			accs.append(float(model.evaluate(X_in[va], y[va], verbose=0)[1]))
 		print(f'[keras][cv] accs={accs}, mean={np.mean(accs):.4f}')
-		model = build_cs230_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=1e-6)
+		model = build_Custom_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=1e-6)
 		h = model.fit(X_in, y, validation_split=0.15, epochs=epochs, batch_size=batch, verbose=1)
 		_save_curves(h, logs, 'keras_cv_final')
 		model.save(save_path)
@@ -127,14 +127,14 @@ def train_keras(save_path: str, max_len: int, n_fft: int, hop: int, add_deltas: 
 		best_lr = None
 		for j, cfg in enumerate(grid, start=1):
 			print(f"[keras][grid] combo {j}/{len(grid)}: {cfg}")
-			model = build_cs230_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=float(cfg['learning_rate']))
+			model = build_Custom_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=float(cfg['learning_rate']))
 			h = model.fit(X_in, y, validation_split=0.15, epochs=epochs, batch_size=batch, verbose=1)
 			acc = float(max(h.history.get('val_accuracy', [0.0])))
 			_save_curves(h, logs, f'keras_grid_lr{cfg["learning_rate"]}')
 			if acc > best_acc:
 				best_acc = acc; best_lr = cfg['learning_rate']
 		print(f"[keras][grid] best lr={best_lr} val_acc={best_acc:.4f}")
-		model = build_cs230_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=float(best_lr or 1e-3))
+		model = build_Custom_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=float(best_lr or 1e-3))
 		h = model.fit(X_in, y, validation_split=0.15, epochs=epochs, batch_size=batch, verbose=1)
 		_save_curves(h, logs, 'keras_grid_final')
 		model.save(save_path)
@@ -147,7 +147,7 @@ def train_keras(save_path: str, max_len: int, n_fft: int, hop: int, add_deltas: 
 			print(f"[keras][cvgrid] combo {j}/{len(grid)}: {cfg}")
 			scores: List[float] = []
 			for i, (tr, va) in enumerate(kf.split(X_in, y), start=1):
-				model = build_cs230_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=float(cfg['learning_rate']))
+				model = build_Custom_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=float(cfg['learning_rate']))
 				cbs = [
 					callbacks.EarlyStopping(monitor='val_accuracy', mode='max', patience=3, restore_best_weights=True),
 					callbacks.ReduceLROnPlateau(monitor='val_accuracy', mode='max', factor=0.5, patience=2, min_lr=1e-6),
@@ -161,12 +161,12 @@ def train_keras(save_path: str, max_len: int, n_fft: int, hop: int, add_deltas: 
 			if m > best_mean:
 				best_mean = m; best_cfg = cfg
 		print(f"[keras][cvgrid] best cfg={best_cfg} mean_val_acc={best_mean:.4f}")
-		model = build_cs230_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=float((best_cfg or {'learning_rate':1e-3})['learning_rate']))
+		model = build_Custom_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=float((best_cfg or {'learning_rate':1e-3})['learning_rate']))
 		h = model.fit(X_in, y, validation_split=0.15, epochs=epochs, batch_size=batch, verbose=1)
 		_save_curves(h, logs, 'keras_cvgrid_final')
 		model.save(save_path)
 	else:
-		model = build_cs230_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=1e-6)
+		model = build_Custom_cnn(input_shape=input_shape, num_classes=10, use_pool=True, learning_rate=1e-6)
 		h = model.fit(X_in, y, validation_split=0.15, epochs=epochs, batch_size=batch, verbose=1)
 		_save_curves(h, logs, 'keras_train')
 		model.save(save_path)
@@ -252,7 +252,7 @@ def main():
 
 	# Decide artifact name
 	ext = '.joblib' if args.arch=='baseline' else ('' if args.arch=='wav2vec2' else '.keras')
-	default_base = f"{('baseline_svm' if args.arch=='baseline' else ('cs230_cnn' if args.arch=='keras' else 'wav2vec2_digits'))}_{args.mode}_test"
+	default_base = f"{('baseline_svm' if args.arch=='baseline' else ('Custom_cnn' if args.arch=='keras' else 'wav2vec2_digits'))}_{args.mode}_test"
 	base_name = args.name if args.name else default_base
 	artifact = os.path.join(args.out, base_name + ('' if args.arch=='wav2vec2' else ext))
 	if args.avoid_overwrite and os.path.exists(artifact):

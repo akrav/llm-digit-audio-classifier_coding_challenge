@@ -225,13 +225,13 @@ def build_small_cnn(
 	return model
 
 
-def build_cs230_cnn(
+def build_Custom_cnn(
 	input_shape: Tuple[int, int, int],
 	num_classes: int = 10,
 	use_pool: bool = True,
 	learning_rate: float = 1e-6,
 ) -> keras.Model:
-	"""CS230-style CNN: Conv5x5 → ReLU → (Pool) → Conv5x5 → ReLU → (Pool) → Flatten → Dense(1000) → Softmax.
+	"""Custom-style CNN: Conv5x5 → ReLU → (Pool) → Conv5x5 → ReLU → (Pool) → Flatten → Dense(1000) → Softmax.
 
 	Uses MFCC matrix as input proxy for spectrogram.
 	"""
@@ -251,7 +251,7 @@ def build_cs230_cnn(
 	x = layers.Dense(1000, activation="relu")(x)
 	outputs = layers.Dense(num_classes, activation="softmax")(x)
 
-	model = models.Model(inputs=inputs, outputs=outputs, name="cs230_cnn")
+	model = models.Model(inputs=inputs, outputs=outputs, name="Custom_cnn")
 	opt = optimizers.Adam(learning_rate=learning_rate)
 	model.compile(optimizer=opt, loss=losses.SparseCategoricalCrossentropy(), metrics=["accuracy"])
 	return model
